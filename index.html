@@ -20,7 +20,6 @@
             touch-action: none;
         }
         .btn {
-            position: absolute;
             width: 60px;
             height: 60px;
             border-radius: 50%;
@@ -34,22 +33,31 @@
             align-items: center;
             transition: transform 0.2s;
         }
-        .fruit-btn { bottom: 20px; }
-        #apple-btn { left: 20px; }
-        #orange-btn { left: 100px; }
-        #banana-btn { left: 180px; }
-        #grape-btn { left: 260px; }
-        #watermelon-btn { left: 340px; }
-        #peach-btn { left: 420px; }
-        #kiwi-btn { left: 500px; }
-        .tree-btn { top: 20px; }
+        #fruit-selector {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            height: 80px;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+        .fruit-btn {
+            display: inline-flex;
+            margin-right: 10px;
+        }
+        .tree-btn {
+            position: absolute;
+            top: 20px;
+        }
         #tree-btn { left: 20px; }
         #pine-btn { left: 100px; }
         #palm-btn { left: 180px; }
-        #cactus-btn { left: 260px; }
         #clear-btn {
             position: absolute;
-            bottom: 20px;
+            top: 20px;
             right: 20px;
             padding: 10px 15px;
             font-size: 16px;
@@ -66,15 +74,19 @@
     <button id="tree-btn" class="btn tree-btn" onclick="setTree('🌳')">🌳</button>
     <button id="pine-btn" class="btn tree-btn" onclick="setTree('🌲')">🌲</button>
     <button id="palm-btn" class="btn tree-btn" onclick="setTree('🌴')">🌴</button>
-    <button id="cactus-btn" class="btn tree-btn" onclick="setTree('🌵')">🌵</button>
-    <button id="apple-btn" class="btn fruit-btn" onclick="setFruit('🍎')">🍎</button>
-    <button id="orange-btn" class="btn fruit-btn" onclick="setFruit('🍊')">🍊</button>
-    <button id="banana-btn" class="btn fruit-btn" onclick="setFruit('🍌')">🍌</button>
-    <button id="grape-btn" class="btn fruit-btn" onclick="setFruit('🍇')">🍇</button>
-    <button id="watermelon-btn" class="btn fruit-btn" onclick="setFruit('🍉')">🍉</button>
-    <button id="peach-btn" class="btn fruit-btn" onclick="setFruit('🍑')">🍑</button>
-    <button id="kiwi-btn" class="btn fruit-btn" onclick="setFruit('🥝')">🥝</button>
     <button id="clear-btn" onclick="resetCanvas()">リセット</button>
+    <div id="fruit-selector">
+        <button class="btn fruit-btn" onclick="setFruit('🍎')">🍎</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍊')">🍊</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍋')">🍋</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍌')">🍌</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍇')">🍇</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍉')">🍉</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍑')">🍑</button>
+        <button class="btn fruit-btn" onclick="setFruit('🥝')">🥝</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍍')">🍍</button>
+        <button class="btn fruit-btn" onclick="setFruit('🍒')">🍒</button>
+    </div>
 
     <script>
         const canvas = document.getElementById('canvas');
@@ -85,30 +97,32 @@
         // Web Audio APIのセットアップ
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const sounds = {
-            '🍎': '/api/placeholder/audio',
-            '🍊': '/api/placeholder/audio',
-            '🍌': '/api/placeholder/audio',
-            '🍇': '/api/placeholder/audio',
-            '🍉': '/api/placeholder/audio',
-            '🍑': '/api/placeholder/audio',
-            '🥝': '/api/placeholder/audio'
+            '🍎': 261.63, // C4
+            '🍊': 293.66, // D4
+            '🍋': 329.63, // E4
+            '🍌': 349.23, // F4
+            '🍇': 392.00, // G4
+            '🍉': 440.00, // A4
+            '🍑': 493.88, // B4
+            '🥝': 523.25, // C5
+            '🍍': 587.33, // D5
+            '🍒': 659.25  // E5
         };
 
-        // 音声ファイルの読み込み
-        Object.keys(sounds).forEach(fruit => {
-            fetch(sounds[fruit])
-                .then(response => response.arrayBuffer())
-                .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-                .then(audioBuffer => {
-                    sounds[fruit] = audioBuffer;
-                });
-        });
-
         function playSound(fruit) {
-            const source = audioContext.createBufferSource();
-            source.buffer = sounds[fruit];
-            source.connect(audioContext.destination);
-            source.start();
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(sounds[fruit], audioContext.currentTime);
+            
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
         }
 
         function resizeCanvas() {
@@ -170,22 +184,15 @@
         canvas.addEventListener('mousedown', handleTap);
         canvas.addEventListener('touchstart', handleTap);
 
-        // スクロール防止
-        document.body.addEventListener('touchstart', function(e) {
-            if (e.target == canvas) {
-                e.preventDefault();
-            }
+        // キャンバス上のスクロール防止
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault();
         }, { passive: false });
-        document.body.addEventListener('touchend', function(e) {
-            if (e.target == canvas) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        document.body.addEventListener('touchmove', function(e) {
-            if (e.target == canvas) {
-                e.preventDefault();
-            }
-        }, { passive: false });
+
+        // フルーツセレクター内のスクロールを許可
+        document.getElementById('fruit-selector').addEventListener('touchmove', function(e) {
+            e.stopPropagation();
+        }, { passive: true });
     </script>
 </body>
 </html>
